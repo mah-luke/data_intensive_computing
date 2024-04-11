@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "exercise1"
+version = "0.1.0"
+description = ""
+authors = ["Lukas <lukas.mah@outlook.at>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.9.*"
+mrjob = "^0.7.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
