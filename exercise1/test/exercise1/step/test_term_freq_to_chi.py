@@ -3,7 +3,7 @@ from exercise1.job import ChiSquareCalculator
 from exercise1.step.term_freq_to_chi import Job
 
 
-def test_basic_term_freq_to_chi():
+def test_basic_test_term_freq_to_chi():
     job = Job(
         args=[str(BASE_PATH / "out" / "after_step1.txt")]
     )

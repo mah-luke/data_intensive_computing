@@ -7,11 +7,26 @@ class TermFreqToChi(MRStep):
             mapper=self.mapper, combiner=self.combiner, reducer=self.reducer, **kwargs
         )
 
-    def mapper(self, key: str, value: dict[str, int]):
+    def mapper(self, key: tuple[str, str], value):
         if key[0] == "category":
-            yield (key[0],), (key[1], value)
+            """"""
+            documents_per_cat: dict[str, int] = value["categories"]
+            unique_terms: list[str] = value["terms"]
+            total_documents: int = value["total_documents"]
+
+            for term in unique_terms:
+                """Distribute document per category counts to all terms"""
+                yield ("term", term), (
+                    None,
+                    {
+                        "categories": documents_per_cat,
+                        "total_documents": total_documents,
+                    },
+                )
         else:
-            yield key, value
+            """"""
+            # ("term", "<term1>"), {"<cat1>": <cnt_docs>, ...}
+            yield key, (value, None)
 
     def combiner(self, key, values):
         if key[0] == "category":
@@ -19,10 +34,11 @@ class TermFreqToChi(MRStep):
         else:
             yield key, list(values)
 
-    def reducer(self, key, values: any):
+    def reducer(self, key, values):
 
         if key[0] == "category":
-            yield key, {tup[0]: tup[1] for sublist in values for tup in sublist}
+            yield key, list(values)
+            # yield key, {tup[0]: tup[1] for sublist in values for tup in sublist}
 
         else:
             values_list = list(values)
