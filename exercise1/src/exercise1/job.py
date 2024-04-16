@@ -7,12 +7,10 @@ from exercise1.step.top75_to_merged import Top75ToMerged
 
 
 class ChiSquareCalculator(MRJob):
+    DIRS = ["../exercise1"]
 
     def steps(self):
-        return [InputToTermFreq(),
-                TermFreqToChi(),
-                ChiSquareToTop75(),
-                Top75ToMerged()]
+        return [InputToTermFreq(), TermFreqToChi(), ChiSquareToTop75(), Top75ToMerged()]
 
 
 if __name__ == "__main__":

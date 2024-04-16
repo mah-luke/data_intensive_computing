@@ -2,20 +2,19 @@ from collections.abc import Generator
 from mrjob.job import MRJob, MRStep
 from mrjob.options import json
 from typing import Counter
+import logging
 import itertools
+import sys
 
-from exercise1.definitions import BASE_PATH
 from exercise1.model.review import Review
 
+LOG = logging.getLogger()
 
 class InputToTermFreq(MRStep):
     """Do the first step of the Chi Square calculation:
     create the term frequencies for each category.
     """
 
-    stopwords: set[str] = set(
-        open(BASE_PATH / "resource" / "stopwords.txt", "r").readlines()
-    )
 
     def __init__(self, **kwargs):
         super().__init__(
@@ -26,47 +25,60 @@ class InputToTermFreq(MRStep):
         """Map the input documents to the terms based on category"""
         parsed: Review = json.loads(value)
 
+        stopwords: set[str] = set(
+            open("exercise1/stopwords.txt", "r").readlines()
+        )
+
         terms: set[str] = set()
         for term in parsed["reviewText"].split(" "):
-            if term in self.stopwords:
+            if term in stopwords:
                 continue
             else:
                 terms.add(term)
         for term in list(terms):
-            yield ("term", term), parsed["category"]
+            yield f"term_{term}", parsed["category"]
 
-        yield ("category",), parsed["category"]
+        yield "category", parsed["category"]
 
-    def combiner(self, key: tuple[str, str], values: Generator):
+    def combiner(self, key: str, values: Generator):
         """Only return each combination of term and category once"""
 
-        if key[0] == "category":
+        if key.startswith("category"):
             yield key, (None, list(values))
         else:
             values_list = list(values)
             yield key, values_list
-            yield ("category",), (key[1], None)
+            yield "category", (key.split("_", 1)[1], None)
 
     def reducer(self, key: str, values: Generator):
         """Count the occurences of each category per term, this results
         in the count of documents containing each term"""
 
-        if key[0] == "category":
+        if key.startswith("category"):
             values_list: list[dict] = list(values)
+            print(f"Key: {key}, Values: {values_list}", file=sys.stderr)
             categories: list[str] = []
             terms: list[str] = []
+
+            #TODO: somewhere here is bug which results in empty categories
             for tup in values_list:
                 if tup[0] is not None:
-                    terms.append(tup[0])
-                elif tup[1] is not None:
-                    categories += (tup[1])
+                    terms += [tup[0]]
+                if tup[1] is not None:
+                    categories += tup[1]
 
-            counter: dict[str, int] = Counter(categories)
-            yield key, {"categories": counter,
+            print(f"After concat: {categories}", file=sys.stderr)
+
+            cat_counter: dict[str, int] = dict(Counter(categories))
+
+            print(f"After counting: {cat_counter}", file=sys.stderr)
+            print(f"Terms: {terms}", file=sys.stderr)
+            yield key, {"categories": cat_counter,
                         "terms": list(set(terms)),
-                        "total_documents": sum(counter.values())}
+                        "total_documents": sum(cat_counter.values())}
         else:
-            counter: dict[str, int] = Counter(list(itertools.chain(*list(values))))
+            counter: dict[str, int] = dict(Counter(list(itertools.chain(*list(values)))))
+            print(f"Key: {key}, counter_values: {counter}", file=sys.stderr)
             yield key, counter
 
 

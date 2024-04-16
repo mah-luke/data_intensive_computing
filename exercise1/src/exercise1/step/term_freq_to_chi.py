@@ -1,5 +1,6 @@
 from functools import reduce
 from mrjob.job import MRJob, MRStep
+import sys
 
 from exercise1.chi_squares import calculate_chi_squares
 from exercise1.model.category_terms_index import CategoryTermsIndex, ChiCalculation
@@ -17,6 +18,8 @@ class TermFreqToChi(MRStep):
             ("category",), CategoryTermsIndex
             """
             category_value: CategoryTermsIndex = value
+            print(category_value["categories"], file=sys.stderr)
+            print(f"Total cat docs: {category_value['total_documents']}", file=sys.stderr)
 
             for term in category_value["terms"]:
                 """Distribute document per category counts to all terms"""

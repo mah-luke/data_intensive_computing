@@ -4,10 +4,19 @@ pdf:
 		pandoc report.md -o report.pdf; \
 	done
 
-cluster:
+clean:
 	ssh dic "rm -rf ~/exercise1/*"
+
+upload:
 	scp -r src dic:~/exercise1/
-	scp resource/stopwords.txt dic:~/exercise1/resource/stopwords.txt
+	# scp -rp resource/stopwords.txt dic:~/exercise1/resource/stopwords.txt
 
 run_job:
 	ssh dic "python test_hadoop.py --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviews_devset.json"
+
+run:
+	ssh dic "python src/run.py --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviewscombined.json" > out/cluster.txt
+
+# --setup 'export PYTHONPATH=$PYTHONPATH:/home/dic24/e11908553/exercise1/src/exercise1/#'
+run-dev:
+	ssh dic "/sw/venv/python39/dic24/bin/python ~/exercise1/src/run.py  --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviews_devset.json" > out/cluster_dev.txt
