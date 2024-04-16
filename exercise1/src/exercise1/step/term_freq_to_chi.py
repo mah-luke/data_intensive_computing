@@ -1,4 +1,8 @@
+from functools import reduce
 from mrjob.job import MRJob, MRStep
+
+from exercise1.chi_squares import calculate_chi_squares
+from exercise1.model.category_terms_index import CategoryTermsIndex, ChiCalculation
 
 
 class TermFreqToChi(MRStep):
@@ -9,40 +13,49 @@ class TermFreqToChi(MRStep):
 
     def mapper(self, key: tuple[str, str], value):
         if key[0] == "category":
-            """"""
-            documents_per_cat: dict[str, int] = value["categories"]
-            unique_terms: list[str] = value["terms"]
-            total_documents: int = value["total_documents"]
+            """
+            ("category",), CategoryTermsIndex
+            """
+            category_value: CategoryTermsIndex = value
 
-            for term in unique_terms:
+            for term in category_value["terms"]:
                 """Distribute document per category counts to all terms"""
-                yield ("term", term), (
-                    None,
-                    {
-                        "categories": documents_per_cat,
-                        "total_documents": total_documents,
-                    },
-                )
+                yield ("term", term), {
+                    "doc_cnt_per_category": category_value["categories"],
+                    "doc_cnt_total": category_value["total_documents"],
+                }
         else:
-            """"""
-            # ("term", "<term1>"), {"<cat1>": <cnt_docs>, ...}
-            yield key, (value, None)
+            """
+            ("term", <term>), {<category>: <doc_cnt>, ...}
+            """
+            term_value: dict[str, int] = value
+            yield key, {"doc_cnt_term_per_category": term_value}
 
     def combiner(self, key, values):
-        if key[0] == "category":
-            yield key, list(values)
-        else:
-            yield key, list(values)
+        yield key, reduce(lambda a, b: a | b, values)
 
     def reducer(self, key, values):
+        """
+        ("term", <term>), [{"doc_cnt_term_per_category": {<category>: <doc_cnt>, ...},
+                            "doc_cnt_per_category": {<category>: <doc_cnt>, ...},
+                            "doc_cnt_total": cnt}]
+        """
 
-        if key[0] == "category":
-            yield key, list(values)
-            # yield key, {tup[0]: tup[1] for sublist in values for tup in sublist}
+        merged_values: ChiCalculation = reduce(lambda a, b: a | b, values)
+        doc_cnt_term_all_categories = sum(
+            merged_values["doc_cnt_term_per_category"].values()
+        )
 
-        else:
-            values_list = list(values)
-            yield key, values_list
+        for category in merged_values["doc_cnt_term_per_category"]:
+            a = merged_values["doc_cnt_term_per_category"][category]
+            b = doc_cnt_term_all_categories - a
+            c = merged_values["doc_cnt_per_category"][category] - a
+            d = merged_values["doc_cnt_total"] - a - b - c
+
+            chi_square = calculate_chi_squares(
+                a, b, c, d, merged_values["doc_cnt_total"]
+            )
+            yield category, (key[1], chi_square)
 
 
 class Job(MRJob):

@@ -4,9 +4,7 @@ from exercise1.step.term_freq_to_chi import Job
 
 
 def test_basic_test_term_freq_to_chi():
-    job = Job(
-        args=[str(BASE_PATH / "out" / "after_step1.txt")]
-    )
+    job = Job(args=[str(BASE_PATH / "out" / "after_step1.txt")])
 
     with job.make_runner() as runner:
         runner.run()
@@ -16,10 +14,17 @@ def test_basic_test_term_freq_to_chi():
 
 def test_full_job():
     job = ChiSquareCalculator(
-            args=[str(BASE_PATH / "resource" / "reviews_devset_first100.json")])
+        args=[str(BASE_PATH / "resource" / "reviews_devset_first100.json")]
+    )
 
     with job.make_runner() as runner:
         runner.run()
 
 
+def test_full_job_all():
+    job = ChiSquareCalculator(
+        args=[str(BASE_PATH / "resource" / "reviews_devset.json")]
+    )
 
+    with job.make_runner() as runner:
+        runer.run()

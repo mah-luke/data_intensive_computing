@@ -1,5 +1,4 @@
 from collections.abc import Generator
-from mrjob import step
 from mrjob.job import MRJob, MRStep
 from mrjob.options import json
 from typing import Counter
@@ -78,4 +77,3 @@ class Job(MRJob):
 
 if __name__ == "__main__":
     Job().run()
-    # Job().sandbox(str(BASE_PATH / "resource" / "reviews_devset_first100.json")).run()
