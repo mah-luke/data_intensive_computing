@@ -22,7 +22,6 @@ class InputToTermFreq(MRStep):
         super().__init__(
             mapper=self.mapper, combiner=self.combiner, reducer=self.reducer, **kwargs
         )
-        LOG.warn("------- init -------")
 
     # def set_up_logging(cls, quiet=False, verbose=False, stream=None):
     #     log_to_stream(name="mrjob", debug=verbose, stream=stream)
@@ -38,19 +37,20 @@ class InputToTermFreq(MRStep):
             if term in stopwords:
                 continue
             else:
-                yield term, parsed["category"]
+                yield term, str(parsed["category"])
 
     def combiner(self, key: str, values: Generator[str, Any, Any]):
         values_list = list(values)
-        print(str(values_list), file=sys.stderr)
-        [print(type(val), end=" ", file=sys.stderr) for val in values_list]
+        LOG.warning(values_list)
+        LOG.warning(type(values_list))
+        LOG.warning(type(values_list[0]))
+        assert all([isinstance(value, str) for value in values_list])
         counter = Counter(values_list)
         yield key, dict(counter)
 
     def reducer(self, key: str, values: Generator[dict[str, int], Any, Any]):
         doc_cnt_term_per_cat: dict[str, int] = {}
         value_list = list(values)
-        # print(value_list, file=sys.stderr)
         for value in value_list:
             for category, doc_cnt in value.items():
                 if category not in doc_cnt_term_per_cat:

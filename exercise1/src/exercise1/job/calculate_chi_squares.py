@@ -13,8 +13,8 @@ class ChiSquareCalculator(MRJob):
     DIRS = ["../../exercise1"]
     FILES = ["../../stopwords.txt", "../../doc_cnt_cat.json"]
 
-    def set_up_logging(cls, quiet=False, verbose=False, stream=None):
-        log_to_stream(name="mrjob", debug=verbose, stream=stream)
+    # def set_up_logging(cls, quiet=False, verbose=False, stream=None):
+    #     log_to_stream(name="mrjob", debug=verbose, stream=stream)
 
     def steps(self):
         LOG.warning("start steps")

@@ -1,9 +1,12 @@
 import json
+import sys
 from exercise1.definitions import DOC_CNT_CAT_PATH
 from exercise1.job.calculate_chi_squares import ChiSquareCalculator
 from exercise1.job.document_count_per_category import DocumentCountPerCategory
 
 if __name__ == "__main__":
+    logging_kwargs = {"quiet": False, "verbose": False, "stream": sys.stderr}
+
     # job = SimpleJob()
     # job = ChiSquareCalculator()
     job = DocumentCountPerCategory()
@@ -23,6 +26,7 @@ if __name__ == "__main__":
     #     print(key, value, "\n", end="")
 
     job_chi_calc = ChiSquareCalculator()
+    job_chi_calc.set_up_logging(**logging_kwargs)
 
     with job_chi_calc.make_runner() as runner:
         runner.run()
