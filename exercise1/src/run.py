@@ -27,6 +27,8 @@ if __name__ == "__main__":
     with job_chi_calc.make_runner() as runner:
         runner.run()
 
+        for key, value in job.parse_output(runner.cat_output()):
+            print(key, value, "\n", end="")
         top75_terms_per_cat: dict[str, list[tuple[str, int]]] = {
             key: val for key, val in job_chi_calc.parse_output(runner.cat_output())
         }

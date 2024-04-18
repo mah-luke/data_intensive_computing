@@ -1,6 +1,6 @@
 from collections.abc import Generator
 from functools import reduce
-from mrjob.job import MRJob, MRStep
+from mrjob.job import MRJob, MRStep, log_to_stream
 from mrjob.options import json
 from typing import Any, Counter
 import logging
@@ -10,7 +10,7 @@ import sys
 from exercise1.chi_squares import calculate_chi_squares
 from exercise1.model.review import Review
 
-LOG = logging.getLogger()
+LOG = logging.getLogger("mrjob")
 
 
 class InputToTermFreq(MRStep):
@@ -22,8 +22,14 @@ class InputToTermFreq(MRStep):
         super().__init__(
             mapper=self.mapper, combiner=self.combiner, reducer=self.reducer, **kwargs
         )
+        LOG.warn("------- init -------")
+
+    # def set_up_logging(cls, quiet=False, verbose=False, stream=None):
+    #     log_to_stream(name="mrjob", debug=verbose, stream=stream)
+
 
     def mapper(self, _, value: bytearray):
+        LOG.warning("------- start mapper ----------")
         parsed: Review = json.loads(value)
         with open("stopwords.txt", "r") as file:
             stopwords: set[str] = set(file.readlines())
@@ -35,12 +41,17 @@ class InputToTermFreq(MRStep):
                 yield term, parsed["category"]
 
     def combiner(self, key: str, values: Generator[str, Any, Any]):
-        counter = Counter(values)
+        values_list = list(values)
+        print(str(values_list), file=sys.stderr)
+        [print(type(val), end=" ", file=sys.stderr) for val in values_list]
+        counter = Counter(values_list)
         yield key, dict(counter)
 
     def reducer(self, key: str, values: Generator[dict[str, int], Any, Any]):
         doc_cnt_term_per_cat: dict[str, int] = {}
-        for value in values:
+        value_list = list(values)
+        # print(value_list, file=sys.stderr)
+        for value in value_list:
             for category, doc_cnt in value.items():
                 if category not in doc_cnt_term_per_cat:
                     doc_cnt_term_per_cat[category] = doc_cnt
