@@ -24,3 +24,6 @@ run-dev:
 
 forward-hadoop:
 	ssh dic -L 8080:captain01.os.hpc.tuwien.ac.at:19888
+
+forward-dynamic:
+	ssh -ND 9918 diclogin

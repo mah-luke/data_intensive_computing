@@ -1,14 +1,12 @@
 from collections.abc import Generator
-from functools import reduce
-from mrjob.job import MRJob, MRStep, log_to_stream
+from mrjob.job import MRJob, MRStep
 from mrjob.options import json
-from typing import Any, Counter
+from typing import Any
 import logging
-import itertools
-import sys
 
 from exercise1.chi_squares import calculate_chi_squares
 from exercise1.model.review import Review
+from exercise1.util import timed
 
 LOG = logging.getLogger("mrjob")
 
@@ -20,47 +18,61 @@ class InputToTermFreq(MRStep):
 
     def __init__(self, **kwargs):
         super().__init__(
-            mapper=self.mapper, combiner=self.combiner, reducer=self.reducer, **kwargs
+            mapper_init=self.mapper_init,
+            mapper=self.mapper,
+            combiner=self.combiner,
+            reducer_init=self.reducer_init,
+            reducer=self.reducer,
+            **kwargs,
         )
 
-    # def set_up_logging(cls, quiet=False, verbose=False, stream=None):
-    #     log_to_stream(name="mrjob", debug=verbose, stream=stream)
-
+    def mapper_init(self):
+        with open("stopwords.txt", "r") as file:
+            self.stopwords: set[str] = set(file.readlines())
 
     def mapper(self, _, value: bytearray):
-        LOG.warning("------- start mapper ----------")
         parsed: Review = json.loads(value)
-        with open("stopwords.txt", "r") as file:
-            stopwords: set[str] = set(file.readlines())
 
+        terms = set()
         for term in parsed["reviewText"].split(" "):
-            if term in stopwords:
+            if term in self.stopwords:
                 continue
             else:
-                yield term, str(parsed["category"])
+                terms.add(term)
+        # LOG.info(
+        #     f"----- mapper: yielding {len(terms)} terms for cat: {parsed['category']}"
+        # )
+        for term in terms:
+            # LOG.info(f"---- mapper: yielding {term}, {parsed['category']}")
+            yield term, {parsed["category"]: 1}
 
-    def combiner(self, key: str, values: Generator[str, Any, Any]):
-        values_list = list(values)
-        LOG.warning(values_list)
-        LOG.warning(type(values_list))
-        LOG.warning(type(values_list[0]))
-        assert all([isinstance(value, str) for value in values_list])
-        counter = Counter(values_list)
-        yield key, dict(counter)
+    def _merge_dicts(self, dicts: Generator[dict[str, int], Any, Any]):
+        res: dict[str, int] = dict()
+        # dicts_list = list(dicts)
+        for dictionary in dicts:
+            for category, doc_cnt in dictionary.items():
+                if category not in res:
+                    res[category] = doc_cnt
+                else:
+                    res[category] += doc_cnt
+        # LOG.info(f"--- merge_dicts: reduced {len(dicts_list)} to {len(res)}")
+        return res
+
+    def combiner(self, key: str, values: Generator[dict[str, int], Any, Any]):
+        yield key, self._merge_dicts(values)
+
+    def reducer_init(self):
+        # LOG.info("---- reducer_init ----")
+        with open("doc_cnt_cat.json", "r") as file:
+            self.doc_cnt_per_cat: dict[str, int] = json.load(file)
+        self.doc_cnt_total = sum(self.doc_cnt_per_cat.values())
 
     def reducer(self, key: str, values: Generator[dict[str, int], Any, Any]):
-        doc_cnt_term_per_cat: dict[str, int] = {}
-        value_list = list(values)
-        for value in value_list:
-            for category, doc_cnt in value.items():
-                if category not in doc_cnt_term_per_cat:
-                    doc_cnt_term_per_cat[category] = doc_cnt
-                else:
-                    doc_cnt_term_per_cat[category] += doc_cnt
+        doc_cnt_term_per_cat: dict[str, int] = self._merge_dicts(values)
+        # LOG.info(f"---- reducer ----- {key}, {len(doc_cnt_term_per_cat)}")
+        doc_cnt_per_cat = self.doc_cnt_per_cat
+        doc_cnt_total = self.doc_cnt_total
 
-        with open("doc_cnt_cat.json", "r") as file:
-            doc_cnt_per_cat = json.load(file)
-        doc_cnt_total = sum(doc_cnt_per_cat.values())
         doc_cnt_term_all_cat = sum(doc_cnt_term_per_cat.values())
 
         for category, doc_cnt_cur_term in doc_cnt_term_per_cat.items():
@@ -80,67 +92,6 @@ class InputToTermFreq(MRStep):
             #     "doc_cnt_total": doc_cnt_total,
             #     "doc_cnt_term_all_cat": doc_cnt_term_all_cat,
             # }
-
-    # def mapper(self, _, value: bytearray):
-    #     """Map the input documents to the terms based on category"""
-    #     parsed: Review = json.loads(value)
-    #
-    #     stopwords: set[str] = set(
-    #         open("exercise1/stopwords.txt", "r").readlines()
-    #     )
-    #
-    #     terms: set[str] = set()
-    #     for term in parsed["reviewText"].split(" "):
-    #         if term in stopwords:
-    #             continue
-    #         else:
-    #             terms.add(term)
-    #     for term in list(terms):
-    #         yield f"term_{term}", parsed["category"]
-    #
-    #     yield "category", parsed["category"]
-    #
-    # def combiner(self, key: str, values: Generator):
-    #     """Only return each combination of term and category once"""
-    #
-    #     if key.startswith("category"):
-    #         yield key, (None, list(values))
-    #     else:
-    #         values_list = list(values)
-    #         yield key, values_list
-    #         yield "category", (key.split("_", 1)[1], None)
-    #
-    # def reducer(self, key: str, values: Generator):
-    #     """Count the occurences of each category per term, this results
-    #     in the count of documents containing each term"""
-    #
-    #     if key.startswith("category"):
-    #         values_list: list[dict] = list(values)
-    #         print(f"Key: {key}, Values: {values_list}", file=sys.stderr)
-    #         categories: list[str] = []
-    #         terms: list[str] = []
-    #
-    #         #TODO: somewhere here is bug which results in empty categories
-    #         for tup in values_list:
-    #             if tup[0] is not None:
-    #                 terms += [tup[0]]
-    #             if tup[1] is not None:
-    #                 categories += tup[1]
-    #
-    #         print(f"After concat: {categories}", file=sys.stderr)
-    #
-    #         cat_counter: dict[str, int] = dict(Counter(categories))
-    #
-    #         print(f"After counting: {cat_counter}", file=sys.stderr)
-    #         print(f"Terms: {terms}", file=sys.stderr)
-    #         yield key, {"categories": cat_counter,
-    #                     "terms": list(set(terms)),
-    #                     "total_documents": sum(cat_counter.values())}
-    #     else:
-    #         counter: dict[str, int] = dict(Counter(list(itertools.chain(*list(values)))))
-    #         print(f"Key: {key}, counter_values: {counter}", file=sys.stderr)
-    #         yield key, counter
-    #
 
 
 class Job(MRJob):

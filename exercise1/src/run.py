@@ -7,10 +7,9 @@ from exercise1.job.document_count_per_category import DocumentCountPerCategory
 if __name__ == "__main__":
     logging_kwargs = {"quiet": False, "verbose": False, "stream": sys.stderr}
 
-    # job = SimpleJob()
-    # job = ChiSquareCalculator()
-    job = DocumentCountPerCategory()
-
+    # job = DocumentCountPerCategory()
+    # job.set_up_logging(**logging_kwargs)
+    #
     # with job.make_runner() as runner:
     #     runner.run()
     #
@@ -18,12 +17,15 @@ if __name__ == "__main__":
     #         key: val for key, val in job.parse_output(runner.cat_output())
     #     }
     #
-    # print(doc_cnt_cat_out)
+    # # print(doc_cnt_cat_out)
     # with open(DOC_CNT_CAT_PATH, "w") as file:
     #     json.dump(doc_cnt_cat_out, file)
+    #
 
-    # for key, value in job.parse_output(doc_cnt_cat_out):
-    #     print(key, value, "\n", end="")
+
+
+    # # for key, value in job.parse_output(doc_cnt_cat_out):
+    # #     print(key, value, "\n", end="")
 
     job_chi_calc = ChiSquareCalculator()
     job_chi_calc.set_up_logging(**logging_kwargs)
@@ -31,8 +33,8 @@ if __name__ == "__main__":
     with job_chi_calc.make_runner() as runner:
         runner.run()
 
-        for key, value in job.parse_output(runner.cat_output()):
-            print(key, value, "\n", end="")
+        # for key, value in job.parse_output(runner.cat_output()):
+        #     print(key, value, "\n", end="")
         top75_terms_per_cat: dict[str, list[tuple[str, int]]] = {
             key: val for key, val in job_chi_calc.parse_output(runner.cat_output())
         }
@@ -43,7 +45,17 @@ if __name__ == "__main__":
             best_terms.add(tup[0])
 
     best_terms_sorted = sorted(best_terms)
-    print(" ".join(best_terms_sorted))
+
+    output: list[str] = []
+    best_terms_sorted_formatted = " ".join(best_terms_sorted)
+    output.append(best_terms_sorted_formatted)
 
     for key, value in top75_terms_per_cat.items():
-        print(f"<{key}>", " ".join([f"{tup[0]}:{tup[1]}" for tup in value]), sep=" ")
+        output.append(f"<{key}> {' '.join([f'{tup[0]}:{tup[1]}' for tup in value])}")
+
+    output_formatted = "\n".join(output)
+
+    print(output_formatted)
+
+    with open(DOC_CNT_CAT_PATH.parent / "job_result.txt", "w") as file:
+        file.writelines(output_formatted)

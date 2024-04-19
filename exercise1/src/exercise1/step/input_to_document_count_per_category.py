@@ -16,17 +16,17 @@ class InputToDocumentCountPerCategory(MRStep):
         )
 
     def mapper(self, _, value: bytearray):
-        LOG.info(f"------ start mapper ----")
+        # LOG.info(f"------ start mapper ----")
         parsed: Review = json.loads(value)
 
         yield parsed["category"], 1
 
     def combiner(self, key: str, values: Generator[int, None, None]):
-        LOG.info(f"------ start combiner -----")
+        # LOG.info(f"------ start combiner -----")
         yield key, sum(values)
 
     def reducer(self, key: str, values: Generator):
-        LOG.info(f"------ start reducer ------")
+        # LOG.info(f"------ start reducer ------")
         yield key, sum(values)
 
 
