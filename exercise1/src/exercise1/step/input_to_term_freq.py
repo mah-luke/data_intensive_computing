@@ -20,7 +20,7 @@ class InputToTermFreq(MRStep):
         super().__init__(
             mapper_init=self.mapper_init,
             mapper=self.mapper,
-            combiner=self.combiner,
+            # combiner=self.combiner,
             reducer_init=self.reducer_init,
             reducer=self.reducer,
             **kwargs,
@@ -46,7 +46,8 @@ class InputToTermFreq(MRStep):
             # LOG.info(f"---- mapper: yielding {term}, {parsed['category']}")
             yield term, {parsed["category"]: 1}
 
-    def _merge_dicts(self, dicts: Generator[dict[str, int], Any, Any]):
+    @staticmethod
+    def _merge_dicts(dicts: Generator[dict[str, int], Any, Any]):
         res: dict[str, int] = dict()
         # dicts_list = list(dicts)
         for dictionary in dicts:
