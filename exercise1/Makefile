@@ -5,7 +5,8 @@ pdf:
 	done
 
 clean:
-	ssh dic "rm -rf ~/exercise1/*"
+	ssh dic "rm -rf ~/exercise1/tmp"
+	ssh dic "rm -rf ~/exercise1/src"
 
 upload:
 	scp -r src dic:~/exercise1/
