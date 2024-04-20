@@ -5,6 +5,4 @@
 
 /sw/venv/python39/dic24/bin/python run.py \
     --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar \
-    \ # -D mapreduce.job.reduces=435 \
-    \ # -D mapreduce.job.mappers=435 \
     -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviewscombined.json
