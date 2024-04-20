@@ -49,8 +49,8 @@ if __name__ == "__main__":
 
     # -------- Format Job result & print it -----
     # Final step also implemented as a MapReduce Step, but done here as it has a
-    # small and constant size (22 categories * 75 terms) hence it would be overkill using
-    # a MapReduce job for that
+    # small and constant size (22 categories * 75 terms) hence it
+    # would be overkill using a MapReduce job for that
     best_terms: set[str] = set()
     for tup_list in top75_terms_per_cat.values():
         for tup in tup_list:
