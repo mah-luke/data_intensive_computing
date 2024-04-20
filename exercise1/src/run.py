@@ -13,6 +13,7 @@ if __name__ == "__main__":
 
     # -------- First Job -------------------------
     job_args = sys.argv.copy()[1:]
+    job_args.extend(["-D", "mapreduce.job.reduces=24"])
     job = DocumentCountPerCategory(args=job_args)
     job.set_up_logging(**logging_kwargs)
 
@@ -25,6 +26,11 @@ if __name__ == "__main__":
         }
 
     TMP_PATH.mkdir(exist_ok=True)
+    # write result to file, which will be distributed
+    # in second job to all workers.
+    # This is possible because we only have 22 categories
+    # and hence the first job produces a small and constant
+    # size of values.
     with open(TMP_PATH / "doc_cnt_cat.json", "w") as file:
         json.dump(doc_cnt_cat_out, file)
 

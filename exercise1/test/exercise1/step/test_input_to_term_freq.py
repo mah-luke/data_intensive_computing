@@ -2,7 +2,7 @@ import collections
 from collections.abc import Generator
 from functools import reduce
 from exercise1.definitions import BASE_PATH
-from exercise1.step.input_to_term_freq import InputToTermFreq
+from exercise1.step.input_to_term_freq import InputToChiSquare
 import timeit
 import operator
 
@@ -12,7 +12,7 @@ def test_merge_performance():
     dicts_len = 10000
 
 
-    merge = InputToTermFreq._merge_dicts
+    merge = InputToChiSquare._merge_dicts
     d = {"a": 1, "b": 2, "c": 3, "d": 4}
     dicts = [d.copy() for i in range(dicts_len)]
 

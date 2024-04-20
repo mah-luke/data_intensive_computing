@@ -1,19 +1,18 @@
 from collections.abc import Generator
-from mrjob.job import MRJob, MRStep
+from mrjob.job import MRStep
 from mrjob.options import json
 from typing import Any
 import logging
 
 from exercise1.chi_squares import calculate_chi_squares
 from exercise1.model.review import Review
-from exercise1.util import timed
 
 LOG = logging.getLogger("mrjob")
 
 
-class InputToTermFreq(MRStep):
-    """Do the first step of the Chi Square calculation:
-    create the term frequencies for each category.
+class InputToChiSquare(MRStep):
+    """Calculate the chi squares for each term and category and yield
+    category as key and a tuple of term and chi square as value.
     """
 
     def __init__(self, **kwargs):
@@ -31,6 +30,14 @@ class InputToTermFreq(MRStep):
             self.stopwords: set[str] = set(file.readlines())
 
     def mapper(self, _, value: bytearray):
+        """Read the raw input to a dict of type Review, then split
+        the reviewText into separate terms and return for each term
+        the term as key and a dict of category and 1 as value.
+
+        returns:
+            key:    <term>: str
+            value:  {<category>: 1}
+        """
         parsed: Review = json.loads(value)
 
         terms = set()
@@ -39,38 +46,42 @@ class InputToTermFreq(MRStep):
                 continue
             else:
                 terms.add(term)
-        # LOG.info(
-        #     f"----- mapper: yielding {len(terms)} terms for cat: {parsed['category']}"
-        # )
         for term in terms:
-            # LOG.info(f"---- mapper: yielding {term}, {parsed['category']}")
             yield term, {parsed["category"]: 1}
 
     @staticmethod
     def _merge_dicts(dicts: Generator[dict[str, int], Any, Any]):
+        """Merge mutliple dictionaries together to a single dictionary
+        by summing up all values of the same key"""
         res: dict[str, int] = dict()
-        # dicts_list = list(dicts)
         for dictionary in dicts:
             for category, doc_cnt in dictionary.items():
                 if category not in res:
                     res[category] = doc_cnt
                 else:
                     res[category] += doc_cnt
-        # LOG.info(f"--- merge_dicts: reduced {len(dicts_list)} to {len(res)}")
         return res
 
     def combiner(self, key: str, values: Generator[dict[str, int], Any, Any]):
+        """When using the combiner worse runtime results were achieved
+        hence we didn't use it"""
         yield key, self._merge_dicts(values)
 
     def reducer_init(self):
-        # LOG.info("---- reducer_init ----")
+        """Initialize each reducer with the dictionary listing
+        the count of reviews per category which were calculated
+        in the previous job."""
         with open("doc_cnt_cat.json", "r") as file:
             self.doc_cnt_per_cat: dict[str, int] = json.load(file)
         self.doc_cnt_total = sum(self.doc_cnt_per_cat.values())
 
     def reducer(self, key: str, values: Generator[dict[str, int], Any, Any]):
+        """Calculate chi square for each term and category and
+        yield the category as key and a tuple of term and chi square as value.
+        returns:
+            key:    <category>: str
+            value:  (<term>, <chi square value>): tuple[str, int]"""
         doc_cnt_term_per_cat: dict[str, int] = self._merge_dicts(values)
-        # LOG.info(f"---- reducer ----- {key}, {len(doc_cnt_term_per_cat)}")
         doc_cnt_per_cat = self.doc_cnt_per_cat
         doc_cnt_total = self.doc_cnt_total
 
@@ -93,12 +104,3 @@ class InputToTermFreq(MRStep):
             #     "doc_cnt_total": doc_cnt_total,
             #     "doc_cnt_term_all_cat": doc_cnt_term_all_cat,
             # }
-
-
-class Job(MRJob):
-    def steps(self):
-        return [InputToTermFreq()]
-
-
-if __name__ == "__main__":
-    Job().run()
