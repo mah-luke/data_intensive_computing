@@ -3,6 +3,7 @@ from mrjob.job import MRStep
 from mrjob.options import json
 from typing import Any
 import logging
+import re
 
 from exercise1.chi_squares import calculate_chi_squares
 from exercise1.split_text import split_text
@@ -31,6 +32,9 @@ class InputToChiSquare(MRStep):
             self.stopwords: set[str] = set(file.readlines())
             self.stopwords = {word.rstrip("\n") for word in self.stopwords}
 
+            self.pattern_split_characters: re.Pattern = re.compile("[\s\d\(\)\[\]{}\.!\?,;:\+=\-_\"'`~#@&\*%€\$§\\\/]")
+            self.pattern_single_character: re.Pattern = re.compile("(^|\s)\w(\s|$)")
+
     def mapper(self, _, value: bytearray):
         """Read the raw input to a dict of type Review, then split
         the reviewText into separate terms and return for each term
@@ -43,7 +47,7 @@ class InputToChiSquare(MRStep):
         parsed: Review = json.loads(value)
 
         terms = set()
-        for term in split_text(parsed["reviewText"]):
+        for term in split_text(parsed["reviewText"], self.pattern_split_characters, self.pattern_single_character):
             if term in self.stopwords:
                 continue
             else:
