@@ -5,6 +5,7 @@ from typing import Any
 import logging
 
 from exercise1.chi_squares import calculate_chi_squares
+from exercise1.split_text import split_text
 from exercise1.model.review import Review
 
 LOG = logging.getLogger("mrjob")
@@ -28,6 +29,7 @@ class InputToChiSquare(MRStep):
     def mapper_init(self):
         with open("stopwords.txt", "r") as file:
             self.stopwords: set[str] = set(file.readlines())
+            self.stopwords = {word.rstrip("\n") for word in self.stopwords}
 
     def mapper(self, _, value: bytearray):
         """Read the raw input to a dict of type Review, then split
@@ -41,7 +43,7 @@ class InputToChiSquare(MRStep):
         parsed: Review = json.loads(value)
 
         terms = set()
-        for term in parsed["reviewText"].split(" "):
+        for term in split_text(parsed["reviewText"]):
             if term in self.stopwords:
                 continue
             else:
