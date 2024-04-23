@@ -77,9 +77,24 @@ This is implemented as a third map reduce job for a better structure but only a 
 
 # Conclusions
 
-The total runtime of the cluster is **ToDo**, which is below the threshold of 20 minutes.
+The total runtime on the cluster is about 12 minutes, which is below the threshold.
 Of course the task could be solved by a single map reduce job, but the interim results of each mapper would be a more complicated data structure, essentially reducing the simplicity of the task.
 
-## Runtime detailed
+## Result
 
-**ToDo**
+Since it is not possible to manually check our results we heuristically check them.
+For example the top 5 terms for the category "Book" are: author, reading, characters, written and reader.
+All of these terms are obviously related to books and expected to show up in this list.
+It is worth noting that the term characters also shows up in other categories such as "Kindle Store".
+Again this does not come as a surprise since the categories are related, and characters being a topic of a review is also not surprising.
+
+## Runtime
+
+In the table below the runtime is given.
+
+| step                           | runtime           |
+|--------------------------------|------------------:|
+| count review per category      | 1 min 58 sec      |
+| calculate chi-square value     | 8 min 42 sec      |
+| select top 75 terms            | 57 sec            |
+| **total**                      | **11 min 37 sec** |
