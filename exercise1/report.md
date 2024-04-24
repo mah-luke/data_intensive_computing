@@ -59,6 +59,8 @@ This map reduce job is very straight forward.
 
 **reducer**: In this step we sum up the amount of reviews over all the workers and the result is {k: \<category\>, v: # of reviews}.
 
+We specifie 24 reducers since there are only a limited amount of categories and spawning more reducers will cause no benefit.
+
 ## Second MapReduce Job
 
 The second job is similar to the first, but since a toke can occure in multiple categories we work with dictionaries as values.
@@ -70,15 +72,22 @@ Adding a combinder for this job did not result in a shorter runtime, thus it is 
 Then we sum up the amount of reviews per term and category.
 With this information we can calculate the chi-square value and return {k: \<category\>, v: {k: \<term\>, v: $\chi^2$ value}}
 
-## Calculate the final result
+For this job we spawn 1000 reducers. 
+A few tests have shown, that a larger amount of reducers increases the runtime significantly.
+We did not check for diminishing returns since 1000 reducers gave enough performance.
+
+## Third MapReduce Job
 
 Finally we can order the collection of terms for each category and select the top 75 terms.
 This is implemented as a third map reduce job for a better structure but only a reducer step is implemented. 
 
+**reducer**: For each key (category) we order the results and select the top 75 terms.
+
 # Conclusions
 
 The total runtime on the cluster is about 12 minutes, which is below the threshold.
-Of course the task could be solved by a single map reduce job, but the interim results of each mapper would be a more complicated data structure, essentially reducing the simplicity of the task.
+We decided on the structure of three map reduce jobs for a simple structure of the interim results.
+This way the keys are always of the same type and a straight forward pipeline can be used.
 
 ## Result
 
@@ -94,7 +103,7 @@ In the table below the runtime is given.
 
 | step                           | runtime           |
 |--------------------------------|------------------:|
-| count review per category      | 1 min 58 sec      |
+| count review per category      | 57 sec            |
 | calculate chi-square value     | 8 min 42 sec      |
-| select top 75 terms            | 57 sec            |
+| select top 75 terms            | 1 min 58 sec      |
 | **total**                      | **11 min 37 sec** |
