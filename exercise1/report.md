@@ -12,9 +12,9 @@ toc: True
 
 # Introduction
 
-In this exercise we are tasked with performing apreprocessing step for a text classification task.
-We are going to calculate the chi-square value for words in the text corpus.
-The data we are working on are reviews from various Amazon aritcles, divided in disjoint categories.
+In this exercise we are tasked with performing a preprocessing step for a text classification task.
+We are going to calculate the chi-square value for tokens in the text corpus for each of 24 categories.
+The data we are working on are reviews from various Amazon articles, divided in disjoint categories.
 
 # Problem Overview
 
@@ -42,10 +42,10 @@ $$\chi^2_{\text{tc}}=\frac{N(AD-BC)^2}{(A+B)(A+C)(B+D)(C+D)}$$
 
 # Methodology and Approach
 
-Essentially we split the problem into two map reduce jobs.
-In a first step the amount of reviews for each category is calculated, while the second job counts the amount of reviews a term occurs in per category.
-With the result of the first jobs we are able to calculate the chi-square value for each term and category.
-As a final step we can select the top 75 terms for each category and return the result.
+We split the problem into two map reduce jobs.
+In the only step of the first job the amount of reviews for each category is calculated.
+With the result of the first job we are able to calculate the chi-square value for each term and category in the reducer of the first step of the second job.
+The final step sorts the terms and yields the top 75 terms for each category.
 
 ![](figures/jobs.drawio.pdf)
 
@@ -55,37 +55,46 @@ This map reduce job is very straight forward.
 
 **mapper**: For each review check the category and append a key-value pair of the form {k: \<category\>, v: 1} to the result.
 
-**combiner**: On each worker we can sum up the amount of reviews per category and return {k: \<category\>, v: # of reviews}.
+**combiner**: On each worker the sum for each category (key) is calculated and returned {k: \<category\>, v: # of reviews}.
 
 **reducer**: In this step we sum up the amount of reviews over all the workers and the result is {k: \<category\>, v: # of reviews}.
 
-We specifie 24 reducers since there are only a limited amount of categories and spawning more reducers will cause no benefit.
+We specify 24 reducers according to the amount of categories. Spawning more reducers will cause no benefit, as they will not be used.
 
 ## Second MapReduce Job
 
-The second job is similar to the first, but since a toke can occure in multiple categories we work with dictionaries as values.
-Adding a combinder for this job did not result in a shorter runtime, thus it is not implemented.
+### Step 1
 
-**mapper**: For each review iterate over the tokens and return {k: \<term\>, v: {k: \<category\>, v: 1}}.
+The second job, similarly to the first one, also counts occurrences per review. However, this time the occurrences of tokens inside the review text are counted. Since there are multiple tokens per review, the counts of tokens are stored inside a map (dictionary) as value.
+Adding a combiner for this job resulted in longer runtimes, hence it is implemented but not used.
 
-**reducer**: During initialization we read the result of the first map reduce job. 
+**mapper**: For each review iterate over the unique tokens (done by using a set) and return {k: \<term\>, v: {k: \<category\>, v: 1}}.
+
+**reducer**: During initialization we read the result of the first map reduce job, as the result of the first job is of a small and constant size (only 24 categories).
 Then we sum up the amount of reviews per term and category.
-With this information we can calculate the chi-square value and return {k: \<category\>, v: {k: \<term\>, v: $\chi^2$ value}}
+With this information we calculate the chi-square value and return {k: \<category\>, v: {k: \<term\>, v: $\chi^2$ value}}
 
-For this job we spawn 1000 reducers. 
-A few tests have shown, that a larger amount of reducers increases the runtime significantly.
-We did not check for diminishing returns since 1000 reducers gave enough performance.
+For this job we spawn 1000 reducers.
+A few tests have shown, that a larger amount of reducers decreased the runtime significantly, which is the expected behaviour.
+We did check for 1, 10, 400 and 1000 reducers, the latter one achieving the best performance.
 
-## Third MapReduce Job
+### Step 2
 
 Finally we can order the collection of terms for each category and select the top 75 terms.
-This is implemented as a third map reduce job for a better structure but only a reducer step is implemented. 
+This is achieved by utilizing a map reduce step containing only a reducer.
 
 **reducer**: For each key (category) we order the results and select the top 75 terms.
 
+## Post Processing
+The result of the second map reduce job is transformed into the final output not as map reduce job,
+but rather directly on the host which starts the jobs, as the result of the second job is already relatively
+small (75 tokens each for 24 categories) and using a map reduce job would be overkill.
+
+Once the output is formatted, it is written to the file system to the 'out' directory, as well as printed to standard output.
+
 # Conclusions
 
-The total runtime on the cluster is about 12 minutes, which is below the threshold.
+The total computation time on the cluster is about 12 minutes, which is below the threshold.
 We decided on the structure of three map reduce jobs for a simple structure of the interim results.
 This way the keys are always of the same type and a straight forward pipeline can be used.
 
