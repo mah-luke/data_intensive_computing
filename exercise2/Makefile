@@ -9,8 +9,13 @@ clean:
 	ssh dic "rm -rf ~/exercise2/src"
 
 upload:
-	scp -r src dic:~/exercise2/
-	# scp -rp resource/stopwords.txt dic:~/exercise1/resource/stopwords.txt
+	cd src && zip -r exercise2.zip exercise2
+	scp -r src dic:~/exercise2
+	scp -rp resource/stopwords.txt dic:~/exercise2/resource/stopwords.txt
+	scp pyproject.toml dic:~/exercise2
+
+download:
+	ssh dic "cat ~/exercise2/output_rdd.txt" > output_rdd.txt
 
 # run_job:
 # 	ssh dic "python test_hadoop.py --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviews_devset.json"
@@ -35,4 +40,5 @@ forward-hadoop:
 	ssh dic -L 8080:captain01.os.hpc.tuwien.ac.at:19888
 
 forward-dynamic:
-	ssh -ND 9918 diclogin
+	ssh -ND 9918 diclogin:wa
+
