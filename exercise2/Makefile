@@ -5,19 +5,18 @@ pdf:
 	done
 
 clean:
-	ssh dic "rm -rf ~/exercise1/tmp"
-	ssh dic "rm -rf ~/exercise1/src"
+	ssh dic "rm -rf ~/exercise2/tmp"
+	ssh dic "rm -rf ~/exercise2/src"
 
 upload:
-	scp -r src dic:~/exercise1/
+	scp -r src dic:~/exercise2/
 	# scp -rp resource/stopwords.txt dic:~/exercise1/resource/stopwords.txt
 
 # run_job:
 # 	ssh dic "python test_hadoop.py --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviews_devset.json"
 
-run:
-	# ssh dic "/sw/venv/python39/dic24/bin/python ~/exercise1/src/run.py --hadoop-streaming-jar /usr/lib/hadoop/tools/lib/hadoop-streaming-3.3.5.jar -D mapreduce.job.reduces=435 -r hadoop hdfs:///user/dic24_shared/amazon-reviews/full/reviewscombined.json" > out/output.txt
-	ssh dic "~/exercise1/src/run.sh" > out/output.txt
+# run:
+# 	ssh dic "~/exercise1/src/run.sh" > out/output.txt
 
 # --setup 'export PYTHONPATH=$PYTHONPATH:/home/dic24/e11908553/exercise1/src/exercise1/#'
 run-dev:
