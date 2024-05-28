@@ -124,13 +124,74 @@ We call mapValues on the result, in which we sort each list and then only return
 The 2 calls to mapValues could have been done in one step as well, which could potentially result in a slightly better performance.
 
 ### Top joined tokens and output generation
-Last step, we produced the RDD with the top 75 tokens per category. This RDD is converted into the first part of the output text file by converting each list of tokens into strings as specified for the assignment and then joining them together with \\n.
+Last step, we produced the RDD with the top 75 tokens per category. This RDD is converted into the first part of the output text file by converting each list of tokens into strings as specified for the assignment and then joining them together with "\\n".
 
 Calculation of the overall top tokens is done by applying flatMap, which yields only each token, the category is omitted. Those tokens are then deduplicated by calling the distinct method.
 The result is then sorted and collected to a list, to then be converted to a string and appended to the other result, which results in the final result, which is written to "output_rdd.txt".
 
 
+### Comparison to Assignment 1
+The selected tokens are very similar, however the Chi-square values are considerably higher for assignment 1.
+Those differences however would not create a big difference for the ranking, as both apporaches yield similar top tokens for each category. For example in the category "Toys_and_Game" the tokens toys, toy, son, lego, doll, etc. appear for both approaches in the top 10.
+
+The differences could be caused by a slightly different splitting logic or some other differences during the calculation of the
+chi square values.
+
 ## Task 2: Spark ML TF-IDF pipeline
+In task 2 we use Spark Dataframes and Spark ML to create a TF-IDF pipeline, which will be used in task 3 to predict
+categories.
+
+For this task we load the dataset into a Spark Dataframe by utilizing the read.json method of SparkSession.
+
+### Pipeline initialization
+To create the pipeline, we first define all stages of the pipeline by initializing the respective classes.
+First is the RegexTokenizer, which is used to split the review text into tokens, based on a given regex. The regex from
+the last exercise is once again reused, as it exactly specifies the characters used to split the text.
+
+We also set minTokenLength to 2 to automatically exclude tokens of a single character, which is required by the
+speicification and previously had to be done by an additional processing step.
+
+In the second step of the pipeline we add a StopWordsRemover, which removes often used terms which only act a noise as they
+ are regularly used to express meaning in the language (e.g. the, is, ...). This step replaces the loading of the stopwords textfile
+  and filtering the tokens by that textfile.
+
+After the first two steps we have the cleaned tokens, but in order to use the 'category' column for Chi-square calculation, we need
+to add an StringIndexer, which converts the values of 'category' into numerical values, which will be needed in a later step.
+
+Our tokens need to be converted to numerical values, in order to be processable as features for a machine learning model. One
+way to transform them is calculating the TF-IDF values for each token. In order to obtain the term frequencies (the TF part), we
+create a CountVectorizer, which maps each token value to a number and counts the occurences of each token in the review.
+
+To convert the TF values into TF-IDF, we need to weight the term frequencies by their inverse document frequency (IDF) which
+reduces the influence of tokens, which appear in many reviews and increases the influence of tokens which appear in only a few
+reviews (special terms usually have more influence to the meaning than filler words). We weight the TF values by using an instance of IDF (the Spark class).
+
+The last step is selecting the top 2000 overall tokens by utilizing Chi-square calculation. For that, we use ChisSqSelector
+with the argument of numTopFeatures set to 2000. With this option, the selector only uses the top 2000 terms (by their Chi-square value) and omits the rest. Alternatively, the selector could also select e.g. the top x% of tokens.
+
+
+### Pipeline fitting and token extraction
+We combine all steps of the pipeline by initializing a Pipeline object with a list of all steps as the argument for stages.
+Using this configuration, we can run all stages with a single call to fit and then to transform instead of having to
+call each stage separately.
+
+Once the dataframe is transformed accordingly, we extract the top 2000 tokens as required by the assignment specification.
+However, extracting the tokens is not that simple, because the tokens have been transformed to numericals by the CountVectorizer.
+
+In order to obtain the tokens we first extract the top 2000 features as selected by ChiSqSelector (a list of 2000 integers), which
+are converted back by looking up their string value using the vocabulary produced by CountVectorizer when transforming the tokens.
+
+Once they are converted, the tokens are written to the file 'output_ds.txt'.
+
+### Comparison to Task 1
+The ds file contains more tokens than the rdd file, which makes sense as for the ds file 2000 tokens were selected, for the rdd file
+only $75 * 24$ tokens where selected, which also were deduplicated.
+Both documents share many tokens, especially those, which have a big impact of the category of the review. For example following tokens: action, flavor, game, horror.
+
+One of the differences between both approaches is, that for the rdd file very specific terms, which only differentiate between
+one category and rest had a better chance to end up in the file, as the only condition was whether the token is good to identify
+that single category. On the other hand for the ds file, all categories are combined and terms which differentiate well between
+multiple categories had a better chance. This also explains some of the differences between both files.
 
 
 
