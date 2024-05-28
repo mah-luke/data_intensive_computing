@@ -212,5 +212,5 @@ In the table below the runtime is given.
 | task                           | runtime           |
 |--------------------------------|------------------:|
 | Task 1: Assignment 1 on RDDS   | 4 min 50 sec      |
-| Task 2: TF-IDF pipeline        |                   |
+| Task 2: TF-IDF pipeline        | 19 min 05 sec     |
 | Task 3: SVM model              |                   |
