@@ -5,6 +5,7 @@ author:
 - Lukas Mahler (11908553)
 - Julian Flür (11807481)
 toc: True
+geometry: margin=2cm
 ---
 
 \newpage
@@ -56,7 +57,7 @@ As the cluster does not have our package installed, we zip it and add it to Spar
 addPyFile method.
 Adding that zip allows us to import our package when the notebook is executed on the cluster.
 
-Development on the Devset is done locally (spark runs on our machine), to reduce the load of the cluster. Developing locally also simplifies debugging, as the code is executed by a single machine instead of being distributed amongst multiple workers.
+Development oan the Devset is done loclly (spark runs on our machine), to reduce the load of the cluster. Developing locally also simplifies debugging, as the code is executed by a single machine instead of being distributed amongst multiple workers.
 Following configuration is used for local development:
 ```python
 spark: SparkSession = SparkSession.builder \
@@ -197,13 +198,71 @@ multiple categories had a better chance. This also explains some of the differen
 
 ## Task 3: SVM Classifier
 
+The third and final task is to fit a SVM Classifier to th preprocessed data.
+Pyspark calls such this machine learning model ```LinearSVC```.
+To this end we will fit a pipeline which enabeles us to fit the binary classifier to our multiclass problem.
+
+First we create an ```LinearSVC```object.
+When doing so we can specify the columns for the features and the labels and other parameters, e.g. maximum iterations.
+
+After the fit method is called and the  DataFrame Pysparkis provided.
+The resulting object provides us with a method to predict the classes for the training as well as the test set.
+
+### One vs. Rest
+
+In order to solve the issue of a multiclass classification task with MLlib a binary classifier is fit with the One vs. Rest approach.
+
+For each class we train a classifier which predicts a score for each class against all others.
+The prediction is computed by choosing the class which achieves the highest score.
+This means for our 22 classes of reviews we train 22 classifiers and for the prediction 22 scores are calculated.
+
+The API for the ```OneVsRest``` object is the same as for the classifier.
+
+First we create the object with the binary classifier as parameter, then we call the fit method to for the training data.
+
+### Grid Search
+
+To tune the hyperparameters we aim to perform a grid search with cross validation.
+The MLlib implementation of this is ```CrossValidator```.
+However this does not work with ```oneVsRest``` and ```LinearSVC```.
+
+To this end we had to use a simpler approach with for loops.
+However we showcase the approach we have the code included for a logistic regression model.
+
+### PCA
+
+We also compare the model to a model with greatly reduced number of features.
+This is achieved by calculating 10 principal components.
+The PCA is performed in the preprocessing step already, since it is used with all models to compare.
 
 # Conclusions
 
-
 ## Result
 
+The numbers below are given for the devset, however on the complete data set the results are compareable.
 
+When having a look at the classifiers it can be said that they performed well without PCA.
+
+In the confusion matrices it becomes obvious that the most of the classes are easily distinguished.
+Most of the confusions stem from categories which naturally overlap.
+
+![confusion matrix training set without pca](fig/cm_train.png){ width=50% }
+![confusion matrix test set without pca](fig/cm_test.png){ width=50% }
+
+Other more frequent missclassifications are in cellphone accessories and electronics or sports/outdoors and clothing/shoes/jewlery.
+
+| PCA | training data | test data |
+|-----|--------------:|----------:|
+| no  | 0.736         | 0.646     |
+| yes | 0.431         | 0.432     |
+
+With PCA the F1-score significantly drops but we have to keep in mind that we only 10 features, which is a significant decreas in complexity.
+
+![confusion matrix training set with pca](fig/cm_train_pca.png){ width=50% }
+![confusion matrix test set with pca](fig/cm_test_pca.png){ width=50% }
+
+Checking the Confusion matrix above there are some obvious categories which are missclassified very often.
+Still there are the obvious missclassification due to related classes like books and kindle content.
 
 ## Runtime
 
@@ -213,4 +272,5 @@ In the table below the runtime is given.
 |--------------------------------|------------------:|
 | Task 1: Assignment 1 on RDDS   | 4 min 50 sec      |
 | Task 2: TF-IDF pipeline        | 19 min 05 sec     |
-| Task 3: SVM model              |                   |
+
+For the third task the time could not accurately be measured due to the high load on the provided server.
