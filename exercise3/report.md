@@ -1,5 +1,5 @@
 ---
-title: "Report for Assignment 2"
+title: "Report for Assignment 3"
 subtitle: "Data-Intensive Computing SS2024"
 author:
 - Lukas Mahler (11908553)
@@ -10,207 +10,108 @@ toc: True
 \newpage
 
 # Introduction
-In this report we present our solution of the second assignment for the course Data-Intensive Computing,
-which contained 3 main parts: 1. Redo the first assignment using RDDs, 2. Create a vectorized TF-IDF pipeline
-using Spark ML and 3. Implement a SVM-based classifier on the pipeline of task 2 which predicts the category type
-of a review.
+In this report we present our solution of the third assignment for the course Data-Intensive Computing,
+which contained 2 main parts: 1. Building a flask server to locally run object detection and 2. Adapting the previously built program to run as a lambda function on AWS.
 
-# Problem Overview
+# Problem overview
+
+The aim of this exercise is to build an object detection application and test it both locally and on AWS.
+
+## YOLO model
+
+We are using a pretrained model called YOLOv3 (You Only Look Once version 3) tiny.
+Since it is pretrained it can be used for prediciton straight away.
+The threshold for detection has been set to 0.2 simply to reduce the amount of images with no deteced objects and increase variety.
 
 ## Data set
 
-We are again working on a data set of Amazon reviews.
-While there are 10 attributes, such as **helpful** or a **reviewTime**, we are only interested in two of them.
-Namely:
+To test our solutions we are provided with 100 unlabled images.
 
-- **category**: the category that the product belongs to
-- **reviewText**: the content of the review; this is the text to be processed
+# Local execution
+## Server
 
-Each review is in exactly one category and requires no preprocessing.
+A flask server is createded to implement the required RESTful API.
+It receives the image in its base64 representation, stores it to a temporary folder and uses the locally built darknet implementation.
 
-The review text on the other hand has to be split into unigrams where each token is one word, those
- tokens are used to calculate the TF-IDF for each review.
-We split on whitespaces as well as a list of special characters and digits.
-Also all the text is cast to lower case and certain stopwords are ignored for the analysis.
+The darknet provides a detection fuction which is given the image along side weights and configuration and returns a list of objects, accuracy and the bounding boxes.
+Since we don't need the require the bounding boxes we drop this information and collect to rest of the information in the required format to return to the client.
 
-## Chi-square value
+## Client
 
-The chi-square value is a metric, expressing the dependence between a token and a category.
-Essentially the more often a term is used in a category and the less it is used in reviews from other categories the more important it is.
+The client is a straight forward python script which iterates over all images in a specified folder and sends in one by one to the flask server.
+We track the time and print each result to the console since there is no requirement to store it.
 
-$$\chi^2_{\text{tc}}=\frac{N(AD-BC)^2}{(A+B)(A+C)(B+D)(C+D)}$$
+## Response time
 
-# Methodology and Approach
-Spark is used with the following configuration when running on the server:
-```python
-spark: SparkSession = SparkSession.builder \
-    .appName("cluster") \
-    .config("spark.executor.instances", 435) \
-    .getOrCreate()
-sc: SparkContext = spark.sparkContext
-sc.addPyFile(str(BASE_PATH / "src" / "exercise2.zip"))
-```
-Using 435 executor instances maximizes the synchronizity for the full dataset, allowing to reduce
-the runtime of the notebook considerably.
-As the cluster does not have our package installed, we zip it and add it to Spark with the
-addPyFile method.
-Adding that zip allows us to import our package when the notebook is executed on the cluster.
+On an current Macbook Air the average time it took the flask server to return the result is 0.42 seconds.
 
-Development on the Devset is done locally (spark runs on our machine), to reduce the load of the cluster. Developing locally also simplifies debugging, as the code is executed by a single machine instead of being distributed amongst multiple workers.
-Following configuration is used for local development:
-```python
-spark: SparkSession = SparkSession.builder \
-    .appName("local") \
-    .config("spark.driver.host", "localhost") \
-    .config("spark.driver.bindAddress", "localhost") \
-    .getOrCreate()
-sc: SparkContext = spark.sparkContext
-```
+# Remote execution
 
-## Task 1: RDDs
-We repeat the tasks of the first assignment, this time utilizing Sparks' RDDs.
+All of the AWS files are on the account of Julian Flür and thus the result can be accessed in the data base on this account.
 
-### Load Dataset
-First, the dataset is loaded, using the previously created SparkContext, by calling the
-textFile method. This method loads the the given file line by line, then the map method is used to convert each line into a dictionary by passing in json.loads, which extracts a dictionary from a string in json format.
+## S3 bucket
 
-Now that we the RDD of our dataset loaded, we can calculate the number of reviews in the
-dataset by calling the count method on the RDD, which we will need later to calculate the
-Chi-square values.
+There are two S3 buckets.
+The first one named ```jfimages``` has the purpose of storing the images on which we want to detect the images.
+Secondly we have a bucket to store the YOLOv3-tiny weights file since it is "large" in the context of lambda function files.
 
-### Number of reviews per category
-We also directly count the number of reviews per category, similar to the last assignment, where we created 2 jobs: one to calculate the number of reviews per category, and another to calculate the Chi-square values, which used the results of the first job.
+![S3 bucket containing the images](images/s3.png)
 
-Category counts are calculated in the same manner as for the first job: For each review we map a tuple of ```(<category_name>, 1)```, which is reduced by ```reduceByKey(operator.add)```, which calculates the sum for each category (as the category is the key).
-A dictionary of the calculation is retrieved by calling ```collectAsMap()```.
+## DynamoDB
 
-The stopwords are loaded from the src directory into a set, as a set in Python uses a hashmap as data structure, allowing to check if a value is contained in the set in O(1).
+The data base is used to store the results of the object detection.
+For each image the lambda funciton's result is one row in the results table.
+As id the current time stamp is used in addition to the result the filname is also stored.
 
-In order to obtain the Chi-square values, category counts per token ```(<token>, {<category>: <number_of_reviews>, ...})``` are calculated.
-The list of tokens for each review is generated by splitting the reviewText with the same
-method as in the last exercise: We replace the special splitting characters (specified in the specification of Assignment 1) with spaces, and then replace all characters surrounded by spaces (single character tokens) also with a space. The resulting text is then splitted by the space character, yielding the unfiltered tokens for the review. The unfiltered tokens are deduplicated by using Pythons' set. We iterate over this set and return a list of tuples for each review: ```[(<token>, <category>), ...]```.
+![DynamoDB with results](images/dynamoDB.png)
 
-The token retrieval described above is done inside the flatMap method, which yields each token and category combination separately, allowing to use Sparks' filter method instead of iterating over the tokens directly in Python, which potentially results in a better performance
-due to the optimization possibilities for Spark.
+## Lambda function
 
-Each token is filtered against the stopwords set using the filter method for RDDs and then mapped using the mapValues method: ```{<category>: 1}```. Mapping to a dictionary simplifies
-merging them in the following reduction step.
-We apply the reduceByKey method to the dictionaries for each key, by using the merge_dicts method we created for the last assignment.
-The result of the merge_dicts method is a dictionary with the number of reviews (value) for each category (key).
+The most important building block of the whole setup is the lambda function.
+We have set a trigger which executes the lambda funciton when a file in the S3 bucket is created.
 
-### Chi-square calculation and filtering for top 75 tokens per category
-In the previous steps we collected all information required to calculate the Chi-square values.
-FlatMap on the RDD containing the number of reviews dictionary for each token is applied, which allows to calculate the Chi-square values for each token while also allowing change the indexing from per token to per category.
-This is achieved by the calculate_chi_square_per_token method, which takes the category counts (number of reviews per category) for the current token, the category counts for the full dataset and the total number of reviews for the full dataset.
+The lambda function works very similar to the flask server.
+When it is triggered by an upload we read the bucket and filename from the json.
 
-The Chi-square calculation is done in the same way as last assignment, filling in the formula with the calculated values:
-```python
-def calculate_chi_square_per_token(
-    cur_category_counts: tuple[str, dict[str, int]],
-    category_counts,
-    reviews_cnt):
-doc_cnt_term = sum(cur_category_counts[1].values())
-for category, doc_cnt_cur_term in cur_category_counts[1].items():
-    a = doc_cnt_cur_term
-    b = doc_cnt_term - a
-    c = category_counts[category] - a
-    d = reviews_cnt - a - b - c
-    yield category, (cur_category_counts[0],
-        calculate_chi_squares(a,b,c,d,reviews_cnt))
-```
-The flatMap returns ```(<category>, (<token>, <Chi-square>))```, to which we then apply a groupByKey, which collects all values for the same category (key), and then apply ```mapValues(list)```, which maps the grouped values to a list of tuples.
-We call mapValues on the result, in which we sort each list and then only return the top 75 tokens. As a last step, we sort the category order by applying sortByKey.
+![Trigger on lambda function](images/lambda_trigger.png)
 
-The 2 calls to mapValues could have been done in one step as well, which could potentially result in a slightly better performance.
+Then we load the weights to a temporary file to create the model in the current environment.
+All the other files are included in the lambda function since they are small enough.
 
-### Top joined tokens and output generation
-Last step, we produced the RDD with the top 75 tokens per category. This RDD is converted into the first part of the output text file by converting each list of tokens into strings as specified for the assignment and then joining them together with "\\n".
+Once the model is created, we can load the uploaded image to another temporary file and call the detection function provided by the darknet.
 
-Calculation of the overall top tokens is done by applying flatMap, which yields only each token, the category is omitted. Those tokens are then deduplicated by calling the distinct method.
-The result is then sorted and collected to a list, to then be converted to a string and appended to the other result, which results in the final result, which is written to "output_rdd.txt".
+When we created the lambda function we encountered some issues which we'd briefly like to highlight:
 
+- Since the darknet was initially built on Apple M3 architecture it could not be used in the AWS environment.
+Once we rebuild it on a x86_64 machine we were able to use it with the darknet files on AWS.
 
-### Comparison to Assignment 1
-The selected tokens are very similar, however the Chi-square values are considerably higher for assignment 1.
-Those differences however would not create a big difference for the ranking, as both apporaches yield similar top tokens for each category. For example in the category "Toys_and_Game" the tokens toys, toy, son, lego, doll, etc. appear for both approaches in the top 10.
+- The default configuration for the compute resource of the lambda function was to small for the model.
+Therefore we had to increase memory and storage size.
+Since we were not hard pressed to optimized we chose both big enough.
+If we were very cost concious, we could optimize these.
 
-The differences could be caused by a slightly different splitting logic or some other differences during the calculation of the
-chi square values.
+We utilized the test functionality provided by AWS while developing the lambda function.
+This feature allows us to simulate a image creation event on a bucket without going through the steps of uploading an actual image.
+Conviniently Amazon provides json templates, which can easily be adapted for any use case.
 
-## Task 2: Spark ML TF-IDF pipeline
-In task 2 we use Spark Dataframes and Spark ML to create a TF-IDF pipeline, which will be used in task 3 to predict
-categories.
+## Upload script
 
-For this task we load the dataset into a Spark Dataframe by utilizing the read.json method of SparkSession.
+Very similar to the client of the flask server the upload script is straight forward.
+It iterates over all the images in the input folder and uploads them using the boto3 library.
+Also the average time is calculated.
 
-### Pipeline initialization
-To create the pipeline, we first define all stages of the pipeline by initializing the respective classes.
-First is the RegexTokenizer, which is used to split the review text into tokens, based on a given regex. The regex from
-the last exercise is once again reused, as it exactly specifies the characters used to split the text.
+## Cost
 
-We also set minTokenLength to 2 to automatically exclude tokens of a single character, which is required by the
-speicification and previously had to be done by an additional processing step.
+Since we were on a budget when developing the service, we'd like to mention the amount of money spent for developing and running the service for the data set.
+We spent only a few cents on the whole project.
+The benefit of the serverless execution is that we are only billed for the actual computing time and we don't have to rent a computing resource for the idle time.
+Because each object detection takes only a few seconds the total computing time for the whole data sets is relatively low as well.
 
-In the second step of the pipeline we add a StopWordsRemover, which removes often used terms which only act a noise as they
- are regularly used to express meaning in the language (e.g. the, is, ...). This step replaces the loading of the stopwords textfile
-  and filtering the tokens by that textfile.
+## Execution time
 
-After the first two steps we have the cleaned tokens, but in order to use the 'category' column for Chi-square calculation, we need
-to add an StringIndexer, which converts the values of 'category' into numerical values, which will be needed in a later step.
+The time it takes to upload an image to the S3 bucket was measured in the upload script.
+Over all the images in the data set we have an average upload time of 1.31 seconds.
+Finally the average time it takes to detect the objects on AWS is 2.66 seconds.
 
-Our tokens need to be converted to numerical values, in order to be processable as features for a machine learning model. One
-way to transform them is calculating the TF-IDF values for each token. In order to obtain the term frequencies (the TF part), we
-create a CountVectorizer, which maps each token value to a number and counts the occurences of each token in the review.
-
-To convert the TF values into TF-IDF, we need to weight the term frequencies by their inverse document frequency (IDF) which
-reduces the influence of tokens, which appear in many reviews and increases the influence of tokens which appear in only a few
-reviews (special terms usually have more influence to the meaning than filler words). We weight the TF values by using an instance of IDF (the Spark class).
-
-The last step is selecting the top 2000 overall tokens by utilizing Chi-square calculation. For that, we use ChisSqSelector
-with the argument of numTopFeatures set to 2000. With this option, the selector only uses the top 2000 terms (by their Chi-square value) and omits the rest. Alternatively, the selector could also select e.g. the top x% of tokens.
-
-
-### Pipeline fitting and token extraction
-We combine all steps of the pipeline by initializing a Pipeline object with a list of all steps as the argument for stages.
-Using this configuration, we can run all stages with a single call to fit and then to transform instead of having to
-call each stage separately.
-
-Once the dataframe is transformed accordingly, we extract the top 2000 tokens as required by the assignment specification.
-However, extracting the tokens is not that simple, because the tokens have been transformed to numericals by the CountVectorizer.
-
-In order to obtain the tokens we first extract the top 2000 features as selected by ChiSqSelector (a list of 2000 integers), which
-are converted back by looking up their string value using the vocabulary produced by CountVectorizer when transforming the tokens.
-
-Once they are converted, the tokens are written to the file 'output_ds.txt'.
-
-### Comparison to Task 1
-The ds file contains more tokens than the rdd file, which makes sense as for the ds file 2000 tokens were selected, for the rdd file
-only $75 * 24$ tokens where selected, which also were deduplicated.
-Both documents share many tokens, especially those, which have a big impact of the category of the review. For example following tokens: action, flavor, game, horror.
-
-One of the differences between both approaches is, that for the rdd file very specific terms, which only differentiate between
-one category and rest had a better chance to end up in the file, as the only condition was whether the token is good to identify
-that single category. On the other hand for the ds file, all categories are combined and terms which differentiate well between
-multiple categories had a better chance. This also explains some of the differences between both files.
-
-
-
-## Task 3: SVM Classifier
-
-
-# Conclusions
-
-
-## Result
-
-
-
-## Runtime
-
-In the table below the runtime is given.
-
-| task                           | runtime           |
-|--------------------------------|------------------:|
-| Task 1: Assignment 1 on RDDS   | 4 min 50 sec      |
-| Task 2: TF-IDF pipeline        | 19 min 05 sec     |
-| Task 3: SVM model              |                   |
+In total it takes longer to run the model on AWS however this result is just for a tiny model.
+If we were to use a larger model, where our PC would reach their performance limits it will be cheaper and faster to rent high performance cloud resources to run the model.
